@@ -35,3 +35,7 @@ output "backup_bucket" {
 output "backup_bucket_url" {
   value = "https://${aws_s3_bucket.backups.bucket}.s3.${var.region}.amazonaws.com/"
 }
+
+output "ecr_repo_url" {
+  value = aws_ecr_repository.app.repository_url
+}

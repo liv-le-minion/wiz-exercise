@@ -27,3 +27,11 @@ output "mongo_app_password" {
   value     = random_password.mongo_app.result
   sensitive = true
 }
+
+output "backup_bucket" {
+  value = aws_s3_bucket.backups.bucket
+}
+
+output "backup_bucket_url" {
+  value = "https://${aws_s3_bucket.backups.bucket}.s3.${var.region}.amazonaws.com/"
+}

@@ -111,6 +111,8 @@ resource "aws_instance" "mongo" {
   user_data = templatefile("${path.module}/mongo-userdata.sh", {
     admin_pw = random_password.mongo_admin.result
     app_pw   = random_password.mongo_app.result
+    bucket   = aws_s3_bucket.backups.bucket
+    region   = var.region
   })
   user_data_replace_on_change = true
 

@@ -36,3 +36,26 @@ CONF
 
 systemctl restart mongod
 echo "MONGO SETUP COMPLETE"
+
+# ---------- Daily backup to S3 ----------
+cat > /usr/local/bin/mongo-backup.sh <<'BACKUP'
+#!/bin/bash
+set -euo pipefail
+export AWS_DEFAULT_REGION="${region}"
+TS=$(date -u +%Y%m%dT%H%M%SZ)
+FILE=/tmp/mongo-backup-$TS.archive.gz
+
+mongodump --uri="mongodb://admin:${admin_pw}@localhost:27017/?authSource=admin" --archive=$FILE --gzip
+aws s3 cp $FILE s3://${bucket}/backups/mongo-backup-$TS.archive.gz
+rm -f $FILE
+echo "$(date -u) backup OK: mongo-backup-$TS.archive.gz"
+BACKUP
+chmod 700 /usr/local/bin/mongo-backup.sh
+
+# Run daily at 02:00 UTC
+echo "0 2 * * * root /usr/local/bin/mongo-backup.sh >> /var/log/mongo-backup.log 2>&1" > /etc/cron.d/mongo-backup
+chmod 644 /etc/cron.d/mongo-backup
+
+# Run one backup now so there's something to show
+/usr/local/bin/mongo-backup.sh >> /var/log/mongo-backup.log 2>&1
+echo "BACKUP SETUP COMPLETE"

@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tasky
+  namespace: tasky
+  labels: { app: tasky }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: tasky }
+  template:
+    metadata:
+      labels: { app: tasky }
+    spec:
+      serviceAccountName: tasky-sa
+      containers:
+        - name: tasky
+          image: 228886155047.dkr.ecr.ap-southeast-2.amazonaws.com/wiz-tasky:v1
+          ports:
+            - containerPort: 8080
+          env:
+            # MongoDB access via environment variable (value from K8s Secret)
+            - name: MONGODB_URI
+              valueFrom:
+                secretKeyRef: { name: tasky-secrets, key: MONGODB_URI }
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef: { name: tasky-secrets, key: SECRET_KEY }
+          readinessProbe:
+            tcpSocket: { port: 8080 }
+            initialDelaySeconds: 5
+          resources:
+            requests: { cpu: 100m, memory: 64Mi }
+            limits:   { cpu: 500m, memory: 256Mi }

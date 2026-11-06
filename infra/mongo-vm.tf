@@ -22,7 +22,7 @@ data "aws_ami" "ubuntu_focal" {
 # ---------- SSH key ----------
 resource "aws_key_pair" "mongo" {
   key_name   = "${var.project}-mongo-key"
-  public_key = file(pathexpand("~/.ssh/wiz-mongo.pub"))
+  public_key = file("${path.module}/wiz-mongo.pub")
 }
 
 # ---------- Security group ----------

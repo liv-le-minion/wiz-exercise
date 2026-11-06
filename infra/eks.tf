@@ -6,13 +6,25 @@ module "eks" {
   kubernetes_version = "1.34"
 
   vpc_id     = module.vpc.vpc_id
-  subnet_ids = module.vpc.private_subnets   # nodes in PRIVATE subnets
+  subnet_ids = module.vpc.private_subnets # nodes in PRIVATE subnets
 
   # API endpoint reachable from your Mac for kubectl
   endpoint_public_access = true
 
-  # Give the identity running Terraform (you) cluster-admin for kubectl
-  enable_cluster_creator_admin_permissions = true
+  # Admin pinned to Olivia's user so CI runs don't swap it to the pipeline role
+  enable_cluster_creator_admin_permissions = false
+  access_entries = {
+    cluster_creator = {
+      principal_arn = var.admin_arn
+      policy_associations = {
+        admin = {
+          policy_arn   = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+          access_scope = { type = "cluster" }
+        }
+      }
+    }
+  }
+  kms_key_administrators = [var.admin_arn, aws_iam_role.github_actions.arn]
 
   # Control plane audit logging -> CloudWatch (used in Step 13)
   enabled_log_types = ["api", "audit", "authenticator"]

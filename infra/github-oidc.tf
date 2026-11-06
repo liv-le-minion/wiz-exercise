@@ -23,8 +23,8 @@ data "aws_iam_policy_document" "github_trust" {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
       values = [
-        "repo:${var.github_repo}:ref:refs/heads/main",
-        "repo:${var.github_repo}:pull_request",
+        "${var.github_sub_prefix}:ref:refs/heads/main",
+        "${var.github_sub_prefix}:pull_request",
       ]
     }
   }
@@ -57,4 +57,9 @@ resource "aws_eks_access_policy_association" "github" {
 
 output "github_actions_role_arn" {
   value = aws_iam_role.github_actions.arn
+}
+
+variable "github_sub_prefix" {
+  description = "GitHub immutable OIDC subject (owner and repo IDs) - prevents repo-name takeover"
+  default     = "repo:liv-le-minion@353163170/wiz-exercise@1447789937"
 }

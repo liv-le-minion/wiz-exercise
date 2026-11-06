@@ -1,0 +1,92 @@
+name: app
+
+on:
+  pull_request:
+    paths: ["app/**", "k8s/**", ".github/workflows/app.yml"]
+  push:
+    branches: [main]
+    paths: ["app/**", "k8s/**", ".github/workflows/app.yml"]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+  security-events: write
+
+concurrency:
+  group: app-deploy
+  cancel-in-progress: false
+
+env:
+  ECR_REPO: wiz-tasky
+  CLUSTER: wiz-eks
+  NAMESPACE: tasky
+
+jobs:
+  build-scan-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build image
+        run: |
+          IMAGE=${{ steps.ecr.outputs.registry }}/$ECR_REPO:${GITHUB_SHA::7}
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          docker build --platform linux/amd64 -t "$IMAGE" app
+
+      - name: Verify wizexercise.txt is in the image
+        run: docker run --rm --entrypoint cat "$IMAGE" /app/wizexercise.txt
+
+      - name: Trivy scan (log)
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0, pinned by SHA (CVE-2026-33634)
+        with:
+          version: v0.69.3
+          image-ref: ${{ env.IMAGE }}
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: "0"
+
+      - name: Trivy scan (SARIF)
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
+        with:
+          version: v0.69.3
+          image-ref: ${{ env.IMAGE }}
+          format: sarif
+          output: trivy.sarif
+          severity: HIGH,CRITICAL
+
+      - uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: trivy.sarif
+          category: trivy
+
+      - name: Push to ECR
+        if: github.event_name != 'pull_request'
+        run: |
+          docker push "$IMAGE"
+          docker tag "$IMAGE" ${{ steps.ecr.outputs.registry }}/$ECR_REPO:latest
+          docker push ${{ steps.ecr.outputs.registry }}/$ECR_REPO:latest
+
+      - name: Deploy to EKS
+        if: github.event_name != 'pull_request'
+        run: |
+          aws eks update-kubeconfig --name $CLUSTER
+          sed "s|image: .*wiz-tasky:.*|image: $IMAGE|" k8s/deployment.yaml | kubectl apply -n $NAMESPACE -f -
+          kubectl apply -n $NAMESPACE -f k8s/service.yaml -f k8s/ingress.yaml
+          kubectl -n $NAMESPACE rollout status deployment/tasky --timeout=180s
+
+      - name: Smoke test
+        if: github.event_name != 'pull_request'
+        run: |
+          kubectl -n $NAMESPACE exec deploy/tasky -- cat /app/wizexercise.txt
+          ALB=$(kubectl -n $NAMESPACE get ingress tasky -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          curl -sf -o /dev/null -w "HTTP %{http_code}\n" "http://$ALB"

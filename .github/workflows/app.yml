@@ -89,4 +89,10 @@ jobs:
         run: |
           kubectl -n $NAMESPACE exec deploy/tasky -- cat /app/wizexercise.txt
           ALB=$(kubectl -n $NAMESPACE get ingress tasky -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-          curl -sf -o /dev/null -w "HTTP %{http_code}\n" "http://$ALB"
+          for i in $(seq 1 12); do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://$ALB")
+            echo "attempt $i: HTTP $CODE"
+            [ "$CODE" = "200" ] && exit 0
+            sleep 10
+          done
+          exit 1

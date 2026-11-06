@@ -9,6 +9,11 @@ locals {
 
 # ---------- AUDIT LOGGING: CloudTrail -> private, versioned bucket + CloudWatch Logs ----------
 resource "aws_s3_bucket" "trail" {
+  #checkov:skip=CKV2_AWS_61:Lifecycle rules deliberately denied by the guardrail so audit logs cannot be expired
+  #checkov:skip=CKV_AWS_144:Single-region lab; production would replicate to a separate log-archive account
+  #checkov:skip=CKV_AWS_145:SSE-S3 default encryption; KMS CMK out of scope for the lab, used in production
+  #checkov:skip=CKV_AWS_18:Access logging needs a further bucket; CloudTrail records changes to this bucket
+  #checkov:skip=CKV2_AWS_62:No consumers for S3 event notifications; alerting is via GuardDuty and SNS
   bucket = "${var.project}-audit-logs-${random_id.bucket_suffix.hex}"
 }
 
@@ -106,8 +111,9 @@ resource "aws_s3_bucket_policy" "trail" {
 }
 
 resource "aws_cloudwatch_log_group" "trail" {
+  #checkov:skip=CKV_AWS_158:CloudWatch Logs default encryption; KMS CMK used in production
   name              = "/aws/cloudtrail/${local.trail_name}"
-  retention_in_days = 30
+  retention_in_days = 365
 }
 
 resource "aws_iam_role" "trail_to_cwl" {
@@ -135,6 +141,8 @@ resource "aws_iam_role_policy" "trail_to_cwl" {
 }
 
 resource "aws_cloudtrail" "audit" {
+  #checkov:skip=CKV_AWS_252:Per-log-delivery SNS is noise; alerting is via GuardDuty, EventBridge and SNS
+  #checkov:skip=CKV_AWS_35:SSE-S3 encryption; KMS CMK out of scope for the lab, used in production
   name                          = local.trail_name
   s3_bucket_name                = aws_s3_bucket.trail.id
   is_multi_region_trail         = true
@@ -172,6 +180,7 @@ resource "aws_cloudtrail" "audit" {
 
 # ---------- DETECTIVE CONTROL: GuardDuty + email alert on high-severity findings ----------
 resource "aws_guardduty_detector" "main" {
+  #checkov:skip=CKV2_AWS_3:Single lab account, not an Organizations delegated admin
   enable                       = true
   finding_publishing_frequency = "FIFTEEN_MINUTES"
 }
@@ -189,6 +198,7 @@ resource "aws_guardduty_detector_feature" "eks" {
 }
 
 resource "aws_sns_topic" "security_alerts" {
+  #checkov:skip=CKV_AWS_26:Alert text holds no sensitive data; KMS CMK used in production
   name = "${var.project}-security-alerts"
 }
 

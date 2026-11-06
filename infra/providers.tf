@@ -26,4 +26,8 @@ provider "aws" {
       Owner   = "Olivia"
     }
   }
+
+  ignore_tags {
+    keys = ["aws-apn-id"]
+  }
 }

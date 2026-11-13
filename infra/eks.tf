@@ -30,19 +30,21 @@ module "eks" {
   enabled_log_types = ["api", "audit", "authenticator"]
 
   addons = {
-    vpc-cni                = { before_compute = true }
-    eks-pod-identity-agent = { before_compute = true }
-    kube-proxy             = {}
-    coredns                = {}
+    vpc-cni                = { before_compute = true, addon_version = "v1.23.2-eksbuild.10" }
+    eks-pod-identity-agent = { before_compute = true, addon_version = "v1.4.1-eksbuild.3" }
+    kube-proxy             = { addon_version = "v1.34.6-eksbuild.64" }
+    coredns                = { addon_version = "v1.13.2-eksbuild.75" }
   }
 
   eks_managed_node_groups = {
     default = {
-      ami_type       = "AL2023_x86_64_STANDARD"
-      instance_types = ["t3.medium"]
-      min_size       = 2
-      max_size       = 3
-      desired_size   = 2
+      ami_type                       = "AL2023_x86_64_STANDARD"
+      ami_release_version            = "1.34.12-20261031"
+      use_latest_ami_release_version = false
+      instance_types                 = ["t3.medium"]
+      min_size                       = 2
+      max_size                       = 3
+      desired_size                   = 2
     }
   }
 }
